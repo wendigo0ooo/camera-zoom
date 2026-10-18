@@ -6,6 +6,8 @@
     <string name="cd_torch">El feneri</string>
     <string name="cd_switch">Kamerayı çevir</string>
     <string name="cd_freeze">Dondur</string>
+    <string name="cd_enhance">Gelişmiş netlik</string>
+    <string name="enhance_on">Gelişmiş netlik açık — görüntü işleniyor</string>
     <string name="cd_zoom_in">Yakınlaştır</string>
     <string name="cd_zoom_out">Uzaklaştır</string>
     <string name="zoom_fmt">%1$.1f×</string>
