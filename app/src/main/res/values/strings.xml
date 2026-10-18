@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Dürbün Kamera</string>
+    <string name="perm_title">Kamera izni gerekli</string>
+    <string name="perm_message">Uzaktaki görüntüyü büyütmek için kamera erişimine izin ver.</string>
+    <string name="perm_allow">İzin ver</string>
+    <string name="cd_torch">El feneri</string>
+    <string name="cd_switch">Kamerayı çevir</string>
+    <string name="cd_freeze">Dondur</string>
+    <string name="cd_zoom_in">Yakınlaştır</string>
+    <string name="cd_zoom_out">Uzaklaştır</string>
+    <string name="zoom_fmt">%1$.1f×</string>
+    <string name="frozen_badge">DONDURULDU</string>
+</resources>
