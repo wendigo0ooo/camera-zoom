@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Size
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -62,6 +63,8 @@ class MainActivity : AppCompatActivity() {
 
     @Volatile
     private var lastFrame: Bitmap? = null
+
+    private var lastProcAt = 0L
 
     private lateinit var analyzerExecutor: ExecutorService
     private lateinit var scaleDetector: ScaleGestureDetector
@@ -225,6 +228,13 @@ class MainActivity : AppCompatActivity() {
             proxy.close()
             return
         }
+        // Kare hızını sınırla: ağır işleme CPU'yu doyurup arayüzü kastırmasın.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastProcAt < FRAME_INTERVAL_MS) {
+            proxy.close()
+            return
+        }
+        lastProcAt = now
         try {
             val frame = FrameEnhancer.toBitmap(proxy)
             if (frame != null) {
@@ -341,6 +351,7 @@ class MainActivity : AppCompatActivity() {
         private const val REQ_CAMERA = 10
         private const val SLIDER_MAX = 1000
         private const val MAX_TOTAL_ZOOM = 60f
-        private const val MAX_PROC_WIDTH = 1080
+        private const val MAX_PROC_WIDTH = 720
+        private const val FRAME_INTERVAL_MS = 40L
     }
 }

@@ -42,8 +42,14 @@ object FrameEnhancer {
         return Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
     }
 
+    private var bufPx = IntArray(0)
+    private var bufBlur = IntArray(0)
+    private var bufOut = IntArray(0)
+
     /**
      * Dijital zoom (kırpma) + kaliteli büyütme + gürültü azaltma + keskinleştirme.
+     * Performans için TEK blur geçişi kullanır (hem gürültü azaltma hem keskinleştirme
+     * aynı bulanık veriyi paylaşır) ve tamponları yeniden kullanır.
      *
      * @param crop     donanım zoom'unun üzerine uygulanacak dijital kırpma oranı (>=1)
      * @param targetW  hedef genişlik (ekran), yükseklik oranı korunur
@@ -59,26 +65,23 @@ object FrameEnhancer {
     ): Bitmap {
         val cropped = cropCenter(src, crop)
         val scaled = scaleToWidth(cropped, targetW)
-        val px = IntArray(scaled.width * scaled.height)
-        scaled.getPixels(px, 0, scaled.width, 0, 0, scaled.width, scaled.height)
+        val w = scaled.width
+        val h = scaled.height
+        val n = w * h
 
-        val blurred = boxBlur(px, scaled.width, scaled.height, 1)
+        if (bufPx.size < n) bufPx = IntArray(n)
+        if (bufBlur.size < n) bufBlur = IntArray(n)
+        if (bufOut.size < n) bufOut = IntArray(n)
 
-        val denoised = if (denoise > 0f) {
-            blend(px, blurred, denoise)
-        } else {
-            px
-        }
+        scaled.getPixels(bufPx, 0, w, 0, 0, w, h)
 
-        val out = if (sharpen > 0f) {
-            val blur2 = boxBlur(denoised, scaled.width, scaled.height, 1)
-            unsharp(denoised, blur2, sharpen)
-        } else {
-            denoised
-        }
+        boxBlurInto(bufPx, bufBlur, w, h, 1)
 
-        val result = Bitmap.createBitmap(scaled.width, scaled.height, Bitmap.Config.ARGB_8888)
-        result.setPixels(out, 0, scaled.width, 0, 0, scaled.width, scaled.height)
+        val base = if (denoise > 0f) blendInto(bufPx, bufBlur, bufOut, n, denoise) else bufPx
+        val out = if (sharpen > 0f) unsharpInto(base, bufBlur, bufOut, n, sharpen) else base
+
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        result.setPixels(out, 0, w, 0, 0, w, h)
         return result
     }
 
@@ -100,10 +103,12 @@ object FrameEnhancer {
         return src
     }
 
-    /** O(n) ayrılabilir kutu bulanıklığı (alpha korunur). */
-    private fun boxBlur(src: IntArray, w: Int, h: Int, r: Int): IntArray {
-        val tmp = IntArray(w * h)
-        val out = IntArray(w * h)
+    private var bufTmp = IntArray(0)
+
+    /** O(n) ayrılabilir kutu bulanıklığı (alpha korunur). Sonucu [dst]'ye yazar. */
+    private fun boxBlurInto(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int) {
+        if (bufTmp.size < w * h) bufTmp = IntArray(w * h)
+        val tmp = bufTmp
         val win = 2 * r + 1
 
         for (y in 0 until h) {
@@ -135,7 +140,7 @@ object FrameEnhancer {
                 bs += c and 0xff
             }
             for (y in 0 until h) {
-                out[y * w + x] = (0xff shl 24) or
+                dst[y * w + x] = (0xff shl 24) or
                     ((rs / win) shl 16) or ((gs / win) shl 8) or (bs / win)
                 val co = tmp[(y - r).coerceIn(0, h - 1) * w + x]
                 val ci = tmp[(y + r + 1).coerceIn(0, h - 1) * w + x]
@@ -144,34 +149,34 @@ object FrameEnhancer {
                 bs += (ci and 0xff) - (co and 0xff)
             }
         }
-        return out
     }
 
-    private fun blend(orig: IntArray, blurred: IntArray, amount: Float): IntArray {
-        val out = IntArray(orig.size)
-        for (i in orig.indices) {
+    private fun blendInto(orig: IntArray, blur: IntArray, dst: IntArray, n: Int, amount: Float): IntArray {
+        for (i in 0 until n) {
             val a = orig[i]
-            val b = blurred[i]
-            out[i] = (0xff shl 24) or
+            val b = blur[i]
+            dst[i] = (0xff shl 24) or
                 (mix((a shr 16) and 0xff, (b shr 16) and 0xff, amount) shl 16) or
                 (mix((a shr 8) and 0xff, (b shr 8) and 0xff, amount) shl 8) or
                 mix(a and 0xff, b and 0xff, amount)
         }
-        return out
+        return dst
     }
 
-    /** Unsharp mask: orijinal + miktar*(orijinal - bulanık). */
-    private fun unsharp(orig: IntArray, blurred: IntArray, amount: Float): IntArray {
-        val out = IntArray(orig.size)
-        for (i in orig.indices) {
+    /** Unsharp mask: orijinal + miktar*(orijinal - bulanık). Sonucu [dst]'ye yazar. */
+    private fun unsharpInto(orig: IntArray, blur: IntArray, dst: IntArray, n: Int, amount: Float): IntArray {
+        for (i in 0 until n) {
             val a = orig[i]
-            val b = blurred[i]
-            val r = clamp((a shr 16) and 0xff, ((a shr 16) and 0xff) - ((b shr 16) and 0xff), amount)
-            val g = clamp((a shr 8) and 0xff, ((a shr 8) and 0xff) - ((b shr 8) and 0xff), amount)
-            val bl = clamp(a and 0xff, (a and 0xff) - (b and 0xff), amount)
-            out[i] = (0xff shl 24) or (r shl 16) or (g shl 8) or bl
+            val b = blur[i]
+            val r0 = (a shr 16) and 0xff
+            val g0 = (a shr 8) and 0xff
+            val b0 = a and 0xff
+            val r = clamp(r0, r0 - ((b shr 16) and 0xff), amount)
+            val g = clamp(g0, g0 - ((b shr 8) and 0xff), amount)
+            val bl = clamp(b0, b0 - (b and 0xff), amount)
+            dst[i] = (0xff shl 24) or (r shl 16) or (g shl 8) or bl
         }
-        return out
+        return dst
     }
 
     private fun mix(a: Int, b: Int, amount: Float): Int =
