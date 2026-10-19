@@ -3,6 +3,7 @@ package com.wendigo.camerazoom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
@@ -21,7 +22,10 @@ import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
@@ -46,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permOverlay: LinearLayout
     private lateinit var btnTorch: ImageButton
     private lateinit var btnEnhance: ImageButton
+    private lateinit var btnTele: ImageButton
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var camera: Camera? = null
@@ -55,6 +60,7 @@ class MainActivity : AppCompatActivity() {
     private var torchOn = false
     private var frozen = false
     private var enhanceMode = false
+    private var teleMode = false
 
     private var totalZoom = 1f
 
@@ -84,6 +90,7 @@ class MainActivity : AppCompatActivity() {
         permOverlay = findViewById(R.id.permOverlay)
         btnTorch = findViewById(R.id.btnTorch)
         btnEnhance = findViewById(R.id.btnEnhance)
+        btnTele = findViewById(R.id.btnTele)
         val btnSwitch = findViewById<ImageButton>(R.id.btnSwitch)
         val btnFreeze = findViewById<ImageButton>(R.id.btnFreeze)
         val btnZoomIn = findViewById<ImageButton>(R.id.btnZoomIn)
@@ -95,6 +102,7 @@ class MainActivity : AppCompatActivity() {
 
         btnTorch.setOnClickListener { toggleTorch() }
         btnEnhance.setOnClickListener { toggleEnhance() }
+        btnTele.setOnClickListener { toggleTele() }
         btnSwitch.setOnClickListener { switchCamera() }
         btnFreeze.setOnClickListener { toggleFreeze() }
         btnZoomIn.setOnClickListener { applyZoom(totalZoom * 1.4f) }
@@ -102,6 +110,7 @@ class MainActivity : AppCompatActivity() {
         btnPerm.setOnClickListener { requestCameraPermission() }
 
         btnEnhance.setColorFilter(Color.WHITE)
+        btnTele.setColorFilter(Color.WHITE)
 
         zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -200,12 +209,17 @@ class MainActivity : AppCompatActivity() {
                 it.setAnalyzer(analyzerExecutor) { proxy -> analyzeFrame(proxy) }
             }
 
-        val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        val selector = resolveSelector(provider)
         try {
             provider.unbindAll()
             camera = provider.bindToLifecycle(this, selector, preview, analysis)
             torchOn = false
             btnTorch.setImageResource(R.drawable.ic_flash_off)
+            btnTorch.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
+            camera?.cameraInfo?.zoomState?.value?.let { zs ->
+                minZoom = zs.minZoomRatio
+                maxZoom = zs.maxZoomRatio
+            }
             camera?.cameraInfo?.zoomState?.observe(this) { zs ->
                 minZoom = zs.minZoomRatio
                 maxZoom = zs.maxZoomRatio
@@ -216,11 +230,94 @@ class MainActivity : AppCompatActivity() {
                 updateZoomLabel(totalZoom)
                 updateSlider(totalZoom)
             }
+            updateTeleButton()
             applyZoom(totalZoom)
             zoomSlider.isEnabled = true
         } catch (e: Exception) {
             Toast.makeText(this, "Kamera açılamadı: ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Arka kamerada, varsayılan geniş kameradan belirgin biçimde daha uzun odak
+     * uzunluğuna sahip ayrı bir fiziksel kamera varsa onu seçer. Yoksa varsayılan
+     * (lensFacing) seçici kullanılır ve tele modu kapatılır.
+     */
+    private fun resolveSelector(provider: ProcessCameraProvider): CameraSelector {
+        if (lensFacing == CameraSelector.LENS_FACING_BACK && teleMode) {
+            val teleId = findTeleCameraId(provider)
+            if (teleId != null) {
+                return CameraSelector.Builder()
+                    .addCameraFilter { infos ->
+                        infos.filter { Camera2CameraInfo.from(it).cameraId == teleId }
+                    }
+                    .build()
+            }
+            teleMode = false
+            updateTeleButton()
+        }
+        return CameraSelector.Builder().requireLensFacing(lensFacing).build()
+    }
+
+    private fun findTeleCameraId(provider: ProcessCameraProvider): String? {
+        val defaultInfo = CameraSelector.DEFAULT_BACK_CAMERA
+            .filter(provider.availableCameraInfos)
+            .firstOrNull() ?: return null
+        val defaultId = Camera2CameraInfo.from(defaultInfo).cameraId
+        val baseFocal = maxFocalLength(defaultInfo) ?: return null
+        return provider.availableCameraInfos
+            .filter {
+                it.lensFacing == null || it.lensFacing == CameraSelector.LENS_FACING_BACK
+            }
+            .mapNotNull { info -> maxFocalLength(info)?.let { info to it } }
+            .filter { (info, focal) ->
+                focal >= baseFocal * TELE_FOCAL_RATIO &&
+                    Camera2CameraInfo.from(info).cameraId != defaultId
+            }
+            .maxByOrNull { it.second }
+            ?.let { Camera2CameraInfo.from(it.first).cameraId }
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun maxFocalLength(info: CameraInfo): Float? = try {
+        Camera2CameraInfo.from(info)
+            .getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+            ?.maxOrNull()
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun updateZoomLabel(ratio: Float) {
+        zoomLabel.text = if (teleMode) getString(R.string.zoom_tele_fmt, ratio)
+        else getString(R.string.zoom_fmt, ratio)
+    }
+
+    private fun updateTeleButton() {
+        btnTele.setColorFilter(
+            if (teleMode) ContextCompat.getColor(this, R.color.accent) else Color.WHITE
+        )
+        btnTele.alpha = if (lensFacing == CameraSelector.LENS_FACING_FRONT) 0.4f else 1f
+    }
+
+    private fun toggleTele() {
+        if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+            Toast.makeText(this, R.string.tele_front, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!teleMode && findTeleCameraId(cameraProvider ?: return) == null) {
+            Toast.makeText(this, R.string.tele_none, Toast.LENGTH_LONG).show()
+            return
+        }
+        teleMode = !teleMode
+        Toast.makeText(
+            this,
+            if (teleMode) R.string.tele_on else R.string.tele_off,
+            Toast.LENGTH_SHORT
+        ).show()
+        totalZoom = 1f
+        updateTeleButton()
+        unfreeze()
+        if (hasCameraPermission()) bindCamera()
     }
 
     private fun analyzeFrame(proxy: ImageProxy) {
@@ -277,10 +374,6 @@ class MainActivity : AppCompatActivity() {
         zoomSlider.progress = (t * SLIDER_MAX).toInt().coerceIn(0, SLIDER_MAX)
     }
 
-    private fun updateZoomLabel(ratio: Float) {
-        zoomLabel.text = getString(R.string.zoom_fmt, ratio)
-    }
-
     private fun toggleEnhance() {
         enhanceMode = !enhanceMode
         btnEnhance.setColorFilter(
@@ -311,6 +404,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             CameraSelector.LENS_FACING_BACK
         }
+        teleMode = false
+        updateTeleButton()
         unfreeze()
         if (hasCameraPermission()) bindCamera()
     }
@@ -353,5 +448,6 @@ class MainActivity : AppCompatActivity() {
         private const val MAX_TOTAL_ZOOM = 60f
         private const val MAX_PROC_WIDTH = 720
         private const val FRAME_INTERVAL_MS = 40L
+        private const val TELE_FOCAL_RATIO = 1.25f
     }
 }

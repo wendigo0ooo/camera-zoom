@@ -11,5 +11,11 @@
     <string name="cd_zoom_in">Yakınlaştır</string>
     <string name="cd_zoom_out">Uzaklaştır</string>
     <string name="zoom_fmt">%1$.1f×</string>
+    <string name="zoom_tele_fmt">Tele · %1$.1f×</string>
     <string name="frozen_badge">DONDURULDU</string>
+    <string name="cd_tele">Optik tele kamera</string>
+    <string name="tele_on">Optik tele kamera açık</string>
+    <string name="tele_off">Optik tele kamera kapalı</string>
+    <string name="tele_none">Bu cihazda ayrı optik tele kamera bulunamadı</string>
+    <string name="tele_front">Tele kamera yalnızca arka kamerada kullanılır</string>
 </resources>

@@ -68,6 +68,14 @@
             android:text="@string/app_name" />
 
         <ImageButton
+            android:id="@+id/btnTele"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_tele"
+            android:src="@drawable/ic_tele" />
+
+        <ImageButton
             android:id="@+id/btnEnhance"
             android:layout_width="48dp"
             android:layout_height="48dp"
