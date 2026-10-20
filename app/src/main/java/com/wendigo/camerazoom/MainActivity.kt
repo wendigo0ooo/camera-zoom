@@ -685,9 +685,10 @@ class MainActivity : AppCompatActivity() {
     private fun toggleTorch() {
         val c = camera ?: return
         val target = !torchOn
-        c.cameraControl.enableTorch(target).addListener({
+        val future = c.cameraControl.enableTorch(target)
+        future.addListener({
             try {
-                it.get()
+                future.get()
                 torchOn = target
             } catch (e: Exception) {
                 Log.w(TAG, "torch failed", e)
@@ -800,7 +801,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun tapHaptic() {
-        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     companion object {

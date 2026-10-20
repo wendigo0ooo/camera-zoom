@@ -18,7 +18,7 @@ object ZoomMath {
         val hi = maxZoom.coerceAtLeast(lo)
         if (hi <= lo || sliderMax <= 0) return 0
         val clamped = zoom.coerceIn(lo, hi)
-        val t = (ln(clamped / lo) / ln(hi / lo)).coerceIn(0.0, 1.0)
+        val t = (ln(clamped / lo) / ln(hi / lo)).coerceIn(0f, 1f)
         return (t * sliderMax).roundToInt().coerceIn(0, sliderMax)
     }
 }
