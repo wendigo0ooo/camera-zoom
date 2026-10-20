@@ -8,3 +8,6 @@
 /captures/
 .externalNativeBuild/
 .cxx/
+
+__pycache__/
+*.pyc
