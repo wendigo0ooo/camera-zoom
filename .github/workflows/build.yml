@@ -27,6 +27,9 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Validate sources
+        run: python3 tools/validate_zoom.py
+
       - name: Decode release keystore
         env:
           KS_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -44,7 +47,7 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: gradle assembleDebug assembleRelease --no-daemon --stacktrace
+        run: gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --stacktrace
 
       - name: Collect APKs
         run: |
@@ -66,7 +69,7 @@ jobs:
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2-build${{ github.run_number }}
+          tag_name: v1.4-build${{ github.run_number }}
           name: Dürbün Kamera (build ${{ github.run_number }})
           body: |
             Otomatik derlenen Dürbün Kamera APK'ları (debug + imzalı release).

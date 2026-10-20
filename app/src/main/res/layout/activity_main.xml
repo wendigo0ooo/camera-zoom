@@ -15,16 +15,34 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@string/cd_enhance"
-        android:scaleType="fitCenter"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
 
     <ImageView
         android:id="@+id/freezeView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clickable="true"
         android:contentDescription="@string/cd_freeze"
-        android:scaleType="fitCenter"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
+
+    <View
+        android:id="@+id/focusRing"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:background="@drawable/focus_ring"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/crosshair"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:alpha="0.7"
+        android:background="@drawable/crosshair"
+        android:importantForAccessibility="no" />
 
     <TextView
         android:id="@+id/frozenBadge"
@@ -109,6 +127,91 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/zoomPresets"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="72dp"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="2dp">
+
+        <TextView
+            android:id="@+id/preset1"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/pill_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/preset_1"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/preset5"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/pill_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/preset_5"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/preset10"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/pill_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/preset_10"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/preset30"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/pill_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minWidth="44dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/preset_30"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/zoomBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -134,6 +237,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:contentDescription="@string/cd_zoom_slider"
             android:max="1000"
             android:progress="0"
             android:progressTint="@color/accent"

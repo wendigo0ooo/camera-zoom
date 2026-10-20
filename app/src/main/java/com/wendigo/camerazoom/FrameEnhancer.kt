@@ -32,8 +32,12 @@ object FrameEnhancer {
         } else {
             Bitmap.createBitmap(padded, 0, 0, proxy.width, proxy.height)
         }
+        if (frame !== padded) padded.recycle()
         val rot = proxy.imageInfo.rotationDegrees
-        return if (rot == 0) frame else rotate(frame, rot.toFloat())
+        if (rot == 0) return frame
+        val rotated = rotate(frame, rot.toFloat())
+        frame.recycle()
+        return rotated
     }
 
     private fun rotate(src: Bitmap, degrees: Float): Bitmap {
@@ -56,6 +60,7 @@ object FrameEnhancer {
      * @param denoise  gürültü azaltma gücü (0..1)
      * @param sharpen  keskinleştirme miktarı (0 = kapalı)
      */
+    @Synchronized
     fun process(
         src: Bitmap,
         crop: Float,
@@ -63,18 +68,22 @@ object FrameEnhancer {
         denoise: Float = 0.35f,
         sharpen: Float = 1.1f
     ): Bitmap {
-        val cropped = cropCenter(src, crop)
-        val scaled = scaleToWidth(cropped, targetW)
-        val w = scaled.width
-        val h = scaled.height
+        var working = cropCenter(src, crop)
+        if (targetW > 0 && working.width > targetW) {
+            val scaled = scaleToWidth(working, targetW)
+            if (scaled !== working && working !== src) working.recycle()
+            working = scaled
+        }
+
+        val w = working.width
+        val h = working.height
         val n = w * h
 
         if (bufPx.size < n) bufPx = IntArray(n)
         if (bufBlur.size < n) bufBlur = IntArray(n)
         if (bufOut.size < n) bufOut = IntArray(n)
 
-        scaled.getPixels(bufPx, 0, w, 0, 0, w, h)
-
+        working.getPixels(bufPx, 0, w, 0, 0, w, h)
         boxBlurInto(bufPx, bufBlur, w, h, 1)
 
         val base = if (denoise > 0f) blendInto(bufPx, bufBlur, bufOut, n, denoise) else bufPx
@@ -82,6 +91,13 @@ object FrameEnhancer {
 
         val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         result.setPixels(out, 0, w, 0, 0, w, h)
+        if (working !== src) working.recycle()
+
+        if (targetW > 0 && result.width < targetW) {
+            val upscaled = scaleToWidth(result, targetW)
+            result.recycle()
+            return upscaled
+        }
         return result
     }
 
@@ -95,12 +111,9 @@ object FrameEnhancer {
     }
 
     private fun scaleToWidth(src: Bitmap, targetW: Int): Bitmap {
-        if (targetW <= 0 || src.width == 0) return src
-        if (targetW >= src.width) {
-            val th = (src.height * targetW.toFloat() / src.width).toInt().coerceAtLeast(1)
-            return Bitmap.createScaledBitmap(src, targetW, th, true)
-        }
-        return src
+        if (targetW <= 0 || src.width == 0 || targetW == src.width) return src
+        val th = (src.height * targetW.toFloat() / src.width).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(src, targetW, th, true)
     }
 
     private var bufTmp = IntArray(0)
